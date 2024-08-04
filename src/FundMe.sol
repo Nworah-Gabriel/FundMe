@@ -1,34 +1,60 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
-import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import {AggregatorV3InterfaceLib} from "./library/ETH|USD.sol";
+
+
 
 contract FundMe{
-
-    uint public minimumUsd = 5e18;
+    //Attaching the AggregatorV3InterfaceLib library to uint256 methods
+    using AggregatorV3InterfaceLib for uint256;
+    uint public constant MINIMUM_USD = 5e18;
     mapping(address funder => uint256 amount) public FundRecord;
+    address public owner;
+    mapping(address => uint256) private s_addressToAmountFunded;
+    address[] private s_funders;
+    event Message(string message, uint amount, address senderAddress);
+
+    //defininga custom error
+    error NotOwner();
+
+    constructor(){
+        owner = msg.sender;
+    }
+
+    receive() external payable{
+        fund();
+        emit Message("Recieved ETH", msg.value, msg.sender);
+    }
+
+    fallback() external payable{
+        fund();
+        emit Message("Recieved ETH", msg.value, msg.sender);
+    }
 
     function fund() public payable{
         //Allows users to send $
-        require(getConversionRate(msg.value) >= minimumUsd, "Funding must be greater than 1 ETH");
+        require(msg.value.getConversionRate() >= MINIMUM_USD, "Funding must be greater than 1 ETH");
         FundRecord[msg.sender] += msg.value;
+        s_funders.push(msg.sender);
     }
 
-    function getPrice() public view returns (uint256){
-        //Initializes an instance of the Price Feed using the Interface and contract address
-        AggregatorV3Interface priceFeed = AggregatorV3Interface(0x694AA1769357215DE4FAC081bf1f309aDC325306);
-        (, int256 price, , , ) = priceFeed.latestRoundData();
-        return uint256(price * 1e10);
+    function withdraw() public onlyOwner {
+        for (uint256 funderIndex = 0; funderIndex < s_funders.length; funderIndex++) {
+            address funder = s_funders[funderIndex];
+            s_addressToAmountFunded[funder] = 0;
+        }
+        s_funders = new address[](0);
+
+        //sending all tokens existing in the contract to the contract owner via the 'call' function
+        (bool success,) = owner.call{value: address(this).balance}("");
+        require(success);
     }
 
-    function getConversionRate(uint256 ETHamount) public view returns(uint256){
-        uint256 ethPrice = getPrice();
-        uint256 EthAmountInUsd = (ethPrice * ETHamount) / 1e18;
-        return EthAmountInUsd;
+    modifier onlyOwner{
+        if (msg.sender != owner){
+            revert NotOwner();
+        }
+        // require(msg.sender == owner, "msg.sender is not the owner");
+        _;
     }
-
-    function getVersion() public view returns (uint){ 
-        return AggregatorV3Interface(0x694AA1769357215DE4FAC081bf1f309aDC325306).version();
-    }
-
-    function withdraw() public {}
 }
