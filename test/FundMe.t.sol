@@ -3,6 +3,6 @@ pragma solidity ^0.8.13;
 
 import {Test, console} from "forge-std/Test.sol";
 
-contract CounterTest is Test {
+contract FundMeTest is Test {
     
 }
