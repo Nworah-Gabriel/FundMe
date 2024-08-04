@@ -54,7 +54,6 @@ contract FundMe{
         if (msg.sender != owner){
             revert NotOwner();
         }
-        // require(msg.sender == owner, "msg.sender is not the owner");
         _;
     }
 }
